@@ -1,6 +1,13 @@
 const BACKEND_URI = "";
 
-import { ChatAppResponse, ChatAppResponseOrError, ChatAppRequest, Config, SimpleAPIResponse } from "./models";
+import {
+    ChatAppResponse,
+    ChatAppResponseOrError,
+    ChatAppRequest,
+    Config,
+    SimpleAPIResponse,
+    ResponseMessage
+} from "./models";
 import { useLogin, getToken, isUsingAppServicesLogin } from "../authConfig";
 
 export async function getHeaders(idToken: string | undefined): Promise<Record<string, string>> {
@@ -125,4 +132,68 @@ export async function listUploadedFilesApi(idToken: string): Promise<string[]> {
 
     const dataResponse: string[] = await response.json();
     return dataResponse;
+}
+
+
+export const historyGenerate = async (
+  options: ChatAppRequest,
+  answer: ChatAppResponse,
+  abortSignal: AbortSignal,
+  convId?: string
+): Promise<Response> => {
+  let body
+  if (convId) {
+    body = JSON.stringify({
+      conversation_id: convId,
+      messages: options.messages,
+      response: answer.message.content
+    })
+  } else {
+    body = JSON.stringify({
+      messages: options.messages,
+      response: answer.message.content
+    })
+  }
+  const response = await fetch('/history/generate', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: body,
+    signal: abortSignal
+  })
+    .then(res => {
+      return res
+    })
+    .catch(_err => {
+      console.error('There was an issue fetching your data.')
+      return new Response()
+    })
+  return response
+}
+
+export const historyUpdate = async (messages: ResponseMessage[], convId: string): Promise<Response> => {
+  const response = await fetch('/history/update', {
+    method: 'POST',
+    body: JSON.stringify({
+      conversation_id: convId,
+      messages: messages
+    }),
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+    .then(async res => {
+      return res
+    })
+    .catch(_err => {
+      console.error('There was an issue fetching your data.')
+      const errRes: Response = {
+        ...new Response(),
+        ok: false,
+        status: 500
+      }
+      return errRes
+    })
+  return response
 }

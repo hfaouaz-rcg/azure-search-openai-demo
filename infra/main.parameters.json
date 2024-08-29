@@ -235,6 +235,27 @@
     },
     "runningOnAdo": {
       "value": "${TF_BUILD}"
+    },
+    "azureOpenAiModel": {
+      "value": "${AZURE_OPENAI_MODEL}"
+    },
+    "azureOpenAiEndpoint": {
+      "value": "${AZURE_OPENAI_ENDPOINT}"
+    },
+    "azureCosmosDbAccount": {
+      "value": "${AZURE_COSMOSDB_ACCOUNT}"
+    },
+    "azureCosmosDbDatabase": {
+      "value": "${AZURE_COSMOSDB_DATABASE}"
+    },
+    "azureCosmosDbConversationsContainer": {
+      "value": "${AZURE_COSMOSDB_CONVERSATIONS_CONTAINER}"
+    },
+    "azureCosmosDbAccountKey": {
+      "value": "${AZURE_COSMOSDB_ACCOUNT_KEY}"
+    },
+    "applicationInsightsConnectionString": {
+      "value": "${APPLICATIONINSIGHTS_CONNECTION_STRING}"
     }
   }
 }

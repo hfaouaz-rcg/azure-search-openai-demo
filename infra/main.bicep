@@ -189,6 +189,11 @@ param runningOnGh string = ''
 @description('Whether the deployment is running on Azure DevOps Pipeline')
 param runningOnAdo string = ''
 
+// Used for Cosmos DB
+@description('Cosmos Account name')
+param cosmosAccountName string = ''
+
+
 // Organize resources in a resource group
 resource resourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
   name: !empty(resourceGroupName) ? resourceGroupName : '${abbrs.resourcesResourceGroups}${environmentName}'
@@ -712,6 +717,18 @@ module isolation 'network-isolation.bicep' = {
     vnetName: '${abbrs.virtualNetworks}${resourceToken}'
     appServicePlanName: appServicePlan.outputs.name
     usePrivateEndpoint: usePrivateEndpoint
+  }
+}
+
+// The application database
+module cosmos 'db.bicep' = {
+  name: 'cosmos'
+  scope: resourceGroup(resourceGroupName)
+  params: {
+    accountName: !empty(cosmosAccountName) ? cosmosAccountName : '${abbrs.documentDBDatabaseAccounts}${resourceToken}'
+    location: location
+    tags: tags
+    principalIds: [principalId, backend.outputs.identityPrincipalId]
   }
 }
 

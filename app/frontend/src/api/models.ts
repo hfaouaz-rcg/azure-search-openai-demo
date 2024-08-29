@@ -100,3 +100,10 @@ export interface SpeechConfig {
     isPlaying: boolean;
     setIsPlaying: (isPlaying: boolean) => void;
 }
+
+export type Conversation = {
+  id: string
+  title: string
+  messages: ResponseMessage[]
+  date: string
+}

@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useContext } from "react";
+import { useRef, useState, useEffect, useContext, createContext } from "react";
 import { Checkbox, Panel, DefaultButton, TextField, ITextFieldProps, ICheckboxProps } from "@fluentui/react";
 import { SparkleFilled } from "@fluentui/react-icons";
 import { useId } from "@fluentui/react-hooks";
@@ -16,7 +16,10 @@ import {
     ResponseMessage,
     VectorFieldOptions,
     GPT4VInput,
-    SpeechConfig
+    SpeechConfig,
+    Conversation,
+    historyGenerate,
+    historyUpdate
 } from "../../api";
 import { Answer, AnswerError, AnswerLoading } from "../../components/Answer";
 import { QuestionInput } from "../../components/QuestionInput";
@@ -34,6 +37,34 @@ import { TokenClaimsDisplay } from "../../components/TokenClaimsDisplay";
 import { GPT4VSettings } from "../../components/GPT4VSettings";
 import { toolTipText } from "../../i18n/tooltips.js";
 import { LoginContext } from "../../loginContext";
+
+export interface AppState {
+  isChatHistoryOpen: boolean
+  chatHistory: Conversation[] | null
+  isLoading: boolean;
+  currentChat: Conversation | null
+}
+
+
+export type Action =
+      | { type: 'TOGGLE_CHAT_HISTORY' }
+      | { type: 'UPDATE_CURRENT_CHAT'; payload: Conversation | null }
+      | { type: 'UPDATE_FILTERED_CHAT_HISTORY'; payload: Conversation[] | null }
+      | { type: 'UPDATE_CHAT_HISTORY'; payload: Conversation }
+      | { type: 'UPDATE_CHAT_TITLE'; payload: Conversation }
+      | { type: 'FETCH_CHAT_HISTORY'; payload: Conversation[] | null }
+      | { type: 'GET_FEEDBACK_STATE'; payload: string }
+
+
+const AppStateContext = createContext<
+  | {
+    state: AppState
+    dispatch: React.Dispatch<Action>
+  }
+  | undefined
+>(undefined)
+
+
 
 const Chat = () => {
     const [isConfigPanelOpen, setIsConfigPanelOpen] = useState(false);
@@ -87,6 +118,9 @@ const Chat = () => {
         isPlaying,
         setIsPlaying
     };
+
+    const [conversationId, setConversationId] = useState<string | undefined>("");
+    const appStateContext = useContext(AppStateContext)
 
     const getConfig = async () => {
         configApi().then(config => {
@@ -150,13 +184,14 @@ const Chat = () => {
     const client = useLogin ? useMsal().instance : undefined;
     const { loggedIn } = useContext(LoginContext);
 
-    const makeApiRequest = async (question: string) => {
+    const makeApiRequest = async (question: string, conversationId?: string) => {
         lastQuestionRef.current = question;
 
         error && setError(undefined);
         setIsLoading(true);
         setActiveCitation(undefined);
         setActiveAnalysisPanelTab(undefined);
+        const abortController = new AbortController()
 
         const token = client ? await getToken(client) : undefined;
 
@@ -202,6 +237,9 @@ const Chat = () => {
             if (shouldStream) {
                 const parsedResponse: ChatAppResponse = await handleAsyncRequest(question, answers, response.body);
                 setAnswers([...answers, [question, parsedResponse]]);
+                let history = await historyGenerate(request, parsedResponse, abortController.signal);
+                var body = await history.json();
+                setConversationId(body['id']);
             } else {
                 const parsedResponse: ChatAppResponseOrError = await response.json();
                 if (parsedResponse.error) {
@@ -429,7 +467,12 @@ const Chat = () => {
                             clearOnSend
                             placeholder="Type a new question (e.g. does my plan cover annual eye exams?)"
                             disabled={isLoading}
-                            onSend={question => makeApiRequest(question)}
+                            onSend={(question, id) => {
+                                makeApiRequest(question, id)
+                            }}
+                            conversationId={
+                                appStateContext?.state.currentChat?.id ? appStateContext?.state.currentChat?.id : undefined
+                            }
                             showSpeechInput={showSpeechInput}
                         />
                     </div>

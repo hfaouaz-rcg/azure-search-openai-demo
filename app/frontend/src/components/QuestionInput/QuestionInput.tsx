@@ -2,6 +2,7 @@ import { useState, useEffect, useContext } from "react";
 import { Stack, TextField } from "@fluentui/react";
 import { Button, Tooltip } from "@fluentui/react-components";
 import { Send28Filled } from "@fluentui/react-icons";
+import { useMsal } from "@azure/msal-react";
 
 import styles from "./QuestionInput.module.css";
 import { SpeechInput } from "./SpeechInput";
@@ -9,15 +10,16 @@ import { LoginContext } from "../../loginContext";
 import { requireLogin } from "../../authConfig";
 
 interface Props {
-    onSend: (question: string) => void;
+    onSend: (question: string, id?: string) => void;
     disabled: boolean;
     initQuestion?: string;
     placeholder?: string;
     clearOnSend?: boolean;
     showSpeechInput?: boolean;
+    conversationId?: string
 }
 
-export const QuestionInput = ({ onSend, disabled, placeholder, clearOnSend, initQuestion, showSpeechInput }: Props) => {
+export const QuestionInput = ({ onSend, disabled, placeholder, clearOnSend, initQuestion, showSpeechInput, conversationId }: Props) => {
     const [question, setQuestion] = useState<string>("");
     const { loggedIn } = useContext(LoginContext);
     const [isComposing, setIsComposing] = useState(false);
@@ -31,7 +33,11 @@ export const QuestionInput = ({ onSend, disabled, placeholder, clearOnSend, init
             return;
         }
 
-        onSend(question);
+        if (conversationId) {
+                onSend(question, conversationId)
+        } else {
+            onSend(question)
+        }
 
         if (clearOnSend) {
             setQuestion("");

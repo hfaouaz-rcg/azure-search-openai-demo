@@ -7,6 +7,7 @@ import os
 import time
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, Union, cast
+import uuid
 
 from azure.cognitiveservices.speech import (
     ResultReason,
@@ -85,11 +86,124 @@ from prepdocs import (
 from prepdocslib.filestrategy import UploadUserFileStrategy
 from prepdocslib.listfilestrategy import File
 
+from history.cosmosdbservice import CosmosConversationClient
+from settings import (
+     app_settings,
+     MINIMUM_SUPPORTED_AZURE_OPENAI_PREVIEW_API_VERSION
+)
+
+from auth.auth_utils import get_authenticated_user_details
+
 bp = Blueprint("routes", __name__, static_folder="static")
 # Fix Windows registry issue with mimetypes
 mimetypes.add_type("application/javascript", ".js")
 mimetypes.add_type("text/css", ".css")
 
+@bp.route("/history/update", methods=["POST"])
+async def update_conversation():
+    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+    user_id = authenticated_user["user_principal_id"]
+
+    ## check request for conversation_id
+    request_json = await request.get_json()
+    conversation_id = request_json.get("conversation_id", None)
+
+    try:
+        # make sure cosmos is configured
+        cosmos_conversation_client = init_cosmosdb_client()
+        if not cosmos_conversation_client:
+            raise Exception("CosmosDB is not configured or not working")
+
+        # check for the conversation_id, if the conversation is not set, we will create a new one
+        if not conversation_id:
+            raise Exception("No conversation_id found")
+
+        container = cosmos_conversation_client.cosmosdb_client.get_database_client("db_conversation_history").get_container_client("conversations")
+        items = container.query_items(
+                query=f'SELECT * FROM conversations r WHERE r.conversationId="{conversation_id}"')
+
+        async for doc in items:
+            for key in request_json['messages']:
+                doc[key['role']] = key['content']
+            print(doc)
+        await cosmos_conversation_client.upsert_conversation(doc)
+
+        ## Format the incoming message object in the "chat/completions" messages format
+        ## then write it to the conversation history in cosmos
+        # messages = request_json["messages"]
+        # if len(messages) > 0 and messages[-1]["role"] == "assistant":
+        #     if len(messages) > 1 and messages[-2].get("role", None) == "tool":
+        #         # write the tool message first
+        #         await cosmos_conversation_client.create_message(
+        #             uuid=str(uuid.uuid4()),
+        #             conversation_id=conversation_id,
+        #             user_id=user_id,
+        #             input_message=messages[-2],
+        #         )
+        #     # write the assistant message
+        #     await cosmos_conversation_client.create_message(
+        #         uuid=messages[-1]["id"],
+        #         conversation_id=conversation_id,
+        #         user_id=user_id,
+        #         input_message=messages[-1],
+        #     )
+        # else:
+        #     raise Exception("No bot messages found")
+
+        # Submit request to Chat Completions for response
+        await cosmos_conversation_client.cosmosdb_client.close()
+        response = {"success": True}
+        return jsonify(response), 200
+
+    except Exception as e:
+        logging.exception("Exception in /history/update")
+        return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/history/list", methods=["GET"])
+async def list_conversations():
+    offset = request.args.get("offset", 0)
+    limit = request.args.get("limit", 25)
+    format = request.args.get("format", "json")
+    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+    user_id = authenticated_user["user_principal_id"]
+
+    ## make sure cosmos is configured
+    cosmos_conversation_client = init_cosmosdb_client()
+    if not cosmos_conversation_client:
+        raise Exception("CosmosDB is not configured or not working")
+
+    ## get the conversations from cosmos
+    conversations = await cosmos_conversation_client.get_conversations(
+        user_id, offset=offset, limit=limit
+    )
+    await cosmos_conversation_client.cosmosdb_client.close()
+    if not isinstance(conversations, list):
+        return jsonify({"error": f"No conversations for {user_id} were found"}), 404
+
+    ## return the conversation ids
+    responses = []
+
+    if format == "json":
+        return conversations
+    else:
+        for conversation in conversations:
+            feedback = conversation["feedback"] if "feedback" in conversation else "none"
+            if feedback == "negative":
+                feedback = "<font color=red>negative</font>"
+            comments = conversation["comments"] if "comments" in conversation else "none"
+            responses.append(
+                f"""
+                </tr><td>Updated: </td><td>{conversation['updatedAt']}</td></tr>
+                </tr><td>Question: </td><td>{conversation['content']}</td></tr>
+                </tr><td valign=top>Answer: </td><td>{conversation['answer']}</td></tr> 
+                </tr><td valign=top>Feedback: </td><td>{feedback}</td></tr> 
+                </tr><td valign=top>Comments: </td><td>{comments}</td></tr>
+                <tr><td colspan=2><hr></td></tr>
+                """
+            )
+
+        return "<table>" + "".join(responses) + "</table>", 200
 
 @bp.route("/")
 async def index():
@@ -692,3 +806,97 @@ def create_app():
         app.logger.info("ALLOWED_ORIGIN is set, enabling CORS for %s", allowed_origin)
         cors(app, allow_origin=allowed_origin, allow_methods=["GET", "POST"])
     return app
+
+
+def init_cosmosdb_client():
+    cosmos_conversation_client = None
+    if app_settings.chat_history:
+        try:
+            cosmos_endpoint = (
+                f"https://{app_settings.chat_history.account}.documents.azure.com:443/"
+            )
+
+            if not app_settings.chat_history.account_key:
+                credential = DefaultAzureCredential()
+            else:
+                credential = app_settings.chat_history.account_key
+
+            cosmos_conversation_client = CosmosConversationClient(
+                cosmosdb_endpoint=cosmos_endpoint,
+                credential=credential,
+                database_name=app_settings.chat_history.database,
+                container_name=app_settings.chat_history.conversations_container,
+                enable_message_feedback=app_settings.chat_history.enable_feedback,
+            )
+        except Exception as e:
+            logging.exception("Exception in CosmosDB initialization", e)
+            cosmos_conversation_client = None
+            raise e
+    else:
+        logging.debug("CosmosDB not configured")
+
+    return cosmos_conversation_client
+
+
+## Conversation History API ##
+@bp.route("/history/generate", methods=["POST"])
+async def add_conversation():
+    authenticated_user = get_authenticated_user_details(request_headers=request.headers)
+    user_id = authenticated_user["user_principal_id"]
+
+    ## check request for conversation_id
+    request_json = await request.get_json()
+    conversation_id = request_json.get("conversation_id", None)
+    try:
+        # make sure cosmos is configured
+        cosmos_conversation_client = init_cosmosdb_client()
+        if not cosmos_conversation_client:
+            raise Exception("CosmosDB is not configured or not working")
+
+        # check for the conversation_id, if the conversation is not set, we will create a new one
+        history_metadata = {}
+        if not conversation_id:
+            #title = await generate_title(request_json["messages"])
+            title = "New Client Conversation"
+            conversation_dict = await cosmos_conversation_client.create_conversation(
+                user_id=user_id, title=title
+            )
+            conversation_id = conversation_dict["id"]
+            history_metadata["title"] = title
+            history_metadata["date"] = conversation_dict["createdAt"]
+
+        ## Format the incoming message object in the "chat/completions" messages format
+        ## then write it to the conversation history in cosmos
+
+        messages = request_json["messages"]
+
+        if len(messages) > 0 and messages[-1]["role"] == "user":
+            createdMessageValue = await cosmos_conversation_client.create_message(
+                uuid=str(uuid.uuid4()),
+                conversation_id=conversation_id,
+                user_id=user_id,
+                input_message=messages[-1],
+                answer = request_json['response']
+            )
+            if createdMessageValue == "Conversation not found":
+                raise Exception(
+                    "Conversation not found for the given conversation ID: "
+                    + conversation_id
+                    + "."
+                )
+        else:
+            raise Exception("No user message found")
+
+        await cosmos_conversation_client.cosmosdb_client.close()
+
+        return conversation_dict
+
+        # Submit request to Chat Completions for response
+        #request_body = await request.get_json()
+        #history_metadata["conversation_id"] = conversation_id
+        #request_body["history_metadata"] = history_metadata
+        #return await conversation_internal(request_body, request.headers)
+
+    except Exception as e:
+        logging.exception("Exception in /history/generate")
+        return jsonify({"error": str(e)}), 500
