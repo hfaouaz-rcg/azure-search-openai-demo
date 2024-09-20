@@ -212,6 +212,7 @@ param webAppExists bool
 // Used for Cosmos DB
 @description('Cosmos Account name')
 param cosmosAccountName string = ''
+param captureQuestionAndAnswer bool = false
 
 
 @allowed(['Consumption', 'D4', 'D8', 'D16', 'D32', 'E4', 'E8', 'E16', 'E32', 'NC24-A100', 'NC48-A100', 'NC96-A100'])
@@ -853,7 +854,7 @@ module isolation 'network-isolation.bicep' = {
 }
 
 // The application database
-module cosmos 'db.bicep' = {
+module cosmos 'db.bicep' = if (captureQuestionAndAnswer) {
   name: 'cosmos'
   scope: resourceGroup(resourceGroupName)
   params: {

@@ -245,11 +245,9 @@
     "azureContainerAppsWorkloadProfile": {
       "value": "${AZURE_CONTAINER_APPS_WORKLOAD_PROFILE=Consumption}"
     },
-    "azureOpenAiModel": {
-      "value": "${AZURE_OPENAI_MODEL}"
-    },
-    "azureOpenAiEndpoint": {
-      "value": "${AZURE_OPENAI_ENDPOINT}"
+
+    "captureQuestionAndAnswer": {
+      "value": "${CAPTURE_QUESTION_AND_ANSWER=false}"
     },
     "azureCosmosDbAccount": {
       "value": "${AZURE_COSMOSDB_ACCOUNT}"
@@ -262,9 +260,6 @@
     },
     "azureCosmosDbAccountKey": {
       "value": "${AZURE_COSMOSDB_ACCOUNT_KEY}"
-    },
-    "applicationInsightsConnectionString": {
-      "value": "${APPLICATIONINSIGHTS_CONNECTION_STRING}"
     }
   }
 }
