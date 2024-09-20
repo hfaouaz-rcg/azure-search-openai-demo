@@ -245,9 +245,8 @@
     "azureContainerAppsWorkloadProfile": {
       "value": "${AZURE_CONTAINER_APPS_WORKLOAD_PROFILE=Consumption}"
     },
-
-    "captureQuestionAndAnswer": {
-      "value": "${CAPTURE_QUESTION_AND_ANSWER=false}"
+    "captureQuestionsAndAnswers": {
+      "value": "${CAPTURE_QUESTIONS_AND_ANSWERS=false}"
     },
     "azureCosmosDbAccount": {
       "value": "${AZURE_COSMOSDB_ACCOUNT}"

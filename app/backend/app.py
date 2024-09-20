@@ -78,6 +78,7 @@ from config import (
     CONFIG_USER_BLOB_CONTAINER_CLIENT,
     CONFIG_USER_UPLOAD_ENABLED,
     CONFIG_VECTOR_SEARCH_ENABLED,
+    CONFIG_CAPTURE_QUESTIONS_AND_ANSWERS_ENABLED
 )
 from core.authentication import AuthenticationHelper
 from decorators import authenticated, authenticated_path
@@ -390,6 +391,7 @@ def config():
             "showSpeechInput": current_app.config[CONFIG_SPEECH_INPUT_ENABLED],
             "showSpeechOutputBrowser": current_app.config[CONFIG_SPEECH_OUTPUT_BROWSER_ENABLED],
             "showSpeechOutputAzure": current_app.config[CONFIG_SPEECH_OUTPUT_AZURE_ENABLED],
+            "showCaptureQuestionsAndAnswers": current_app.config[CONFIG_CAPTURE_QUESTIONS_AND_ANSWERS_ENABLED]
         }
     )
 
@@ -553,6 +555,7 @@ async def setup_clients():
     USE_SPEECH_INPUT_BROWSER = os.getenv("USE_SPEECH_INPUT_BROWSER", "").lower() == "true"
     USE_SPEECH_OUTPUT_BROWSER = os.getenv("USE_SPEECH_OUTPUT_BROWSER", "").lower() == "true"
     USE_SPEECH_OUTPUT_AZURE = os.getenv("USE_SPEECH_OUTPUT_AZURE", "").lower() == "true"
+    CAPTURE_QUESTIONS_AND_ANSWERS = os.getenv("CAPTURE_QUESTIONS_AND_ANSWERS", "").lower() == "true"
 
     # WEBSITE_HOSTNAME is always set by App Service, RUNNING_IN_PRODUCTION is set in main.bicep
     RUNNING_ON_AZURE = os.getenv("WEBSITE_HOSTNAME") is not None or os.getenv("RUNNING_IN_PRODUCTION") is not None
@@ -723,6 +726,7 @@ async def setup_clients():
     current_app.config[CONFIG_SPEECH_INPUT_ENABLED] = USE_SPEECH_INPUT_BROWSER
     current_app.config[CONFIG_SPEECH_OUTPUT_BROWSER_ENABLED] = USE_SPEECH_OUTPUT_BROWSER
     current_app.config[CONFIG_SPEECH_OUTPUT_AZURE_ENABLED] = USE_SPEECH_OUTPUT_AZURE
+    current_app.config[CONFIG_CAPTURE_QUESTIONS_AND_ANSWERS_ENABLED] = bool(CAPTURE_QUESTIONS_AND_ANSWERS)
 
     # Various approaches to integrate GPT and external knowledge, most applications will use a single one of these patterns
     # or some derivative, here we include several for exploration purposes

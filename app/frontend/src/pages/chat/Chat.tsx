@@ -113,6 +113,8 @@ const Chat = () => {
     const [showSpeechOutputAzure, setShowSpeechOutputAzure] = useState<boolean>(false);
     const audio = useRef(new Audio()).current;
     const [isPlaying, setIsPlaying] = useState(false);
+    const [captureQuestionsAndAnswers, setCaptureQuestionsAndAnswers] = useState<boolean>(false);
+    const [showCaptureQuestionsAndAnswers, setShowCaptureQuestionsAndAnswers] = useState<boolean>(false);
 
     const speechConfig: SpeechConfig = {
         speechUrls,
@@ -139,6 +141,7 @@ const Chat = () => {
             setShowSpeechInput(config.showSpeechInput);
             setShowSpeechOutputBrowser(config.showSpeechOutputBrowser);
             setShowSpeechOutputAzure(config.showSpeechOutputAzure);
+            setShowCaptureQuestionsAndAnswers(config.showCaptureQuestionsAndAnswers);
         });
     };
 
@@ -355,6 +358,11 @@ const Chat = () => {
         setSelectedAnswer(index);
     };
 
+    const onCaptureQuestionsAndAnswers = (_ev?: React.FormEvent<HTMLElement | HTMLInputElement>, checked?: boolean) => {
+        setCaptureQuestionsAndAnswers(!!checked);
+    };
+
+
     // IDs for form labels and their associated callouts
     const promptTemplateId = useId("promptTemplate");
     const promptTemplateFieldId = useId("promptTemplateField");
@@ -383,6 +391,8 @@ const Chat = () => {
     const shouldStreamId = useId("shouldStream");
     const shouldStreamFieldId = useId("shouldStreamField");
     const { t, i18n } = useTranslation();
+    const captureQuestionsAndAnswersId = useId("captureQuestionsAndAnswersId");
+    const captureQuestionsAndAnswersFieldId = useId("captureQuestionsAndAnswersField");
 
     return (
         <div className={styles.container}>
@@ -672,6 +682,7 @@ const Chat = () => {
                         </>
                     )}
 
+
                     <Checkbox
                         id={suggestFollowupQuestionsFieldId}
                         className={styles.chatSettingsSeparator}
@@ -688,6 +699,26 @@ const Chat = () => {
                             />
                         )}
                     />
+
+                    {showCaptureQuestionsAndAnswers && (
+                        <Checkbox
+                            id={captureQuestionsAndAnswersFieldId}
+                            className={styles.chatSettingsSeparator}
+                            checked={captureQuestionsAndAnswers}
+                            label={t("labels.captureQuestionsAndAnswers")}
+                            onChange={onCaptureQuestionsAndAnswers}
+                            aria-labelledby={captureQuestionsAndAnswersId}
+                            onRenderLabel={(props: ICheckboxProps | undefined) => (
+                                <HelpCallout
+                                    labelId={captureQuestionsAndAnswersId}
+                                    fieldId={captureQuestionsAndAnswersFieldId}
+                                    helpText={t("helpTexts.captureQuestionsAndAnswers")}
+                                    label={props?.label}
+                                />
+                            )}
+                        />
+                    )}
+
 
                     {showGPT4VOptions && (
                         <GPT4VSettings
@@ -706,6 +737,17 @@ const Chat = () => {
                             showImageOptions={useGPT4V && showGPT4VOptions}
                             updateVectorFields={(options: VectorFieldOptions[]) => setVectorFieldList(options)}
                             updateRetrievalMode={(retrievalMode: RetrievalMode) => setRetrievalMode(retrievalMode)}
+                        />
+                    )}
+
+                    {showGPT4VOptions && (
+                        <GPT4VSettings
+                            gpt4vInputs={gpt4vInput}
+                            isUseGPT4V={useGPT4V}
+                            updateUseGPT4V={useGPT4V => {
+                                setUseGPT4V(useGPT4V);
+                            }}
+                            updateGPT4VInputs={inputs => setGPT4VInput(inputs)}
                         />
                     )}
 
